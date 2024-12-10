@@ -1,0 +1,222 @@
+<html>
+<head>
+    <title>CECE LOMPAT</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <script src="https://registry.npmmirror.com/vue/3.3.11/files/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css"></link>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+        .game-container {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+            background: url('https://placehold.co/800x600/skyblue/white?text=CECE+LOMPAT') no-repeat center center;
+            background-size: cover;
+            overflow: hidden;
+        }
+        .bird {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            background: url('URL_GAMBAR_ANDA') no-repeat center center;
+            background-size: cover;
+        }
+        .obstacle {
+            position: absolute;
+            width: 80px;
+            background: url('https://placehold.co/80x800/brown/black') no-repeat center center;
+            background-size: cover;
+        }
+        .cloud {
+            position: absolute;
+            width: 100px;
+            height: 60px;
+            background: url('https://placehold.co/100x60/white/gray') no-repeat center center;
+            background-size: cover;
+            border-radius: 50%;
+            animation: float 5s ease-in-out infinite;
+        }
+        @keyframes float {
+            0% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0); }
+        }
+        .game-over {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: green;
+            font-size: 2rem;
+            display: none;
+        }
+        .game-over.active {
+            display: block;
+        }
+        .game-over button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+        .score {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            font-size: 1.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="game-container" @mousedown="liftBird" @mouseup="dropBird" @touchstart="liftBird" @touchend="dropBird">
+            <div class="score">Score: {{ score }}</div>
+            <div class="bird" :style="{ top: birdY + 'px', left: birdX + 'px' }" style="background: url('CECE.png') no-repeat center center; background-size: cover;"></div>
+            <div v-for="(obstacle, index) in obstacles" :key="index" class="obstacle" :style="{ top: obstacle.y + 'px', left: obstacle.x + 'px', height: obstacle.height + 'px' }"></div>
+            <div v-for="(cloud, index) in clouds" :key="index" class="cloud" :style="{ top: cloud.y + 'px', left: cloud.x + 'px' }"></div>
+            <div class="game-over" :class="{ active: isGameOver }">
+                <div>GAME OVER</div>
+                <div>Your Score: {{ score }}</div>
+                <button @click="restartGame">Play Again</button>
+                <button @click="giveUp">Give Up</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp, ref, onMounted } = Vue;
+
+        createApp({
+            setup() {
+                const birdY = ref(200);
+                const birdX = ref(100);
+                const gravity = ref(2);
+                const lift = ref(-30);
+                const obstacles = ref([]);
+                const clouds = ref([]);
+                const gameSpeed = ref(2);
+                const isGameOver = ref(false);
+                const score = ref(0);
+                let gameInterval;
+
+                const generateObstacle = () => {
+                    const height = Math.floor(Math.random() * 400) + 200; // Increased height range
+                    obstacles.value.push({
+                        x: window.innerWidth,
+                        y: window.innerHeight - height,
+                        height: height,
+                        passed: false
+                    });
+                };
+
+                const generateCloud = () => {
+                    const y = Math.floor(Math.random() * (window.innerHeight - 100));
+                    clouds.value.push({
+                        x: window.innerWidth,
+                        y: y
+                    });
+                };
+
+                const moveObstacles = () => {
+                    obstacles.value.forEach(obstacle => {
+                        obstacle.x -= gameSpeed.value;
+                        if (!obstacle.passed && obstacle.x + 80 < birdX.value) {
+                            score.value++;
+                            obstacle.passed = true;
+                        }
+                    });
+                    obstacles.value = obstacles.value.filter(obstacle => obstacle.x > -80);
+                };
+
+                const moveClouds = () => {
+                    clouds.value.forEach(cloud => {
+                        cloud.x -= gameSpeed.value / 2;
+                    });
+                    clouds.value = clouds.value.filter(cloud => cloud.x > -100);
+                };
+
+                const liftBird = () => {
+                    birdY.value += lift.value;
+                };
+
+                const dropBird = () => {
+                    birdY.value += gravity.value;
+                };
+
+                const checkCollision = () => {
+                    if (birdY.value >= window.innerHeight || birdY.value <= 0) {
+                        isGameOver.value = true;
+                        clearInterval(gameInterval);
+                    }
+                    obstacles.value.forEach(obstacle => {
+                        if (
+                            birdX.value < obstacle.x + 80 &&
+                            birdX.value + 50 > obstacle.x &&
+                            birdY.value < obstacle.y + obstacle.height &&
+                            birdY.value + 50 > obstacle.y
+                        ) {
+                            isGameOver.value = true;
+                            clearInterval(gameInterval);
+                        }
+                    });
+                };
+
+                const gameLoop = () => {
+                    if (!isGameOver.value) {
+                        birdY.value += gravity.value;
+                        moveObstacles();
+                        moveClouds();
+                        checkCollision();
+                        if (Math.random() < 0.02) {
+                            generateObstacle();
+                        }
+                        if (Math.random() < 0.01) {
+                            generateCloud();
+                        }
+                    }
+                };
+
+                const restartGame = () => {
+                    birdY.value = 200;
+                    birdX.value = 100;
+                    obstacles.value = [];
+                    clouds.value = [];
+                    score.value = 0;
+                    isGameOver.value = false;
+                    gameInterval = setInterval(gameLoop, 20);
+                };
+
+                const giveUp = () => {
+                    alert("You gave up!");
+                };
+
+                onMounted(() => {
+                    gameInterval = setInterval(gameLoop, 20);
+                });
+
+                return {
+                    birdY,
+                    birdX,
+                    obstacles,
+                    clouds,
+                    isGameOver,
+                    score,
+                    liftBird,
+                    dropBird,
+                    restartGame,
+                    giveUp
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
